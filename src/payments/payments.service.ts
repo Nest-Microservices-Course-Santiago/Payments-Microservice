@@ -1,13 +1,18 @@
-import { Injectable } from '@nestjs/common';
-import { envs } from 'src/config';
+import { Inject, Injectable, Logger } from '@nestjs/common';
+import { envs, NATS_SERVICE } from 'src/config';
 import Stripe from 'stripe';
 import { PaymentSessionDto } from './dto/payment-session.dto';
 import { Request, Response } from 'express';
+import { ClientProxy } from '@nestjs/microservices';
 
 @Injectable()
 export class PaymentsService {
     private readonly stripe = new Stripe(envs.stripeSecret)
+    private readonly logger = new Logger('PaymentsService')
 
+    constructor(
+        @Inject(NATS_SERVICE) private readonly client: ClientProxy
+    ) { }
     async createPaymentSession(paymentSessionDto: PaymentSessionDto) {
         const { currency, items, orderId } = paymentSessionDto;
         const lineItems = items.map(item => {
@@ -36,7 +41,12 @@ export class PaymentsService {
             cancel_url: envs.stripeCancelUrl,
         })
 
-        return session
+        // return session
+        return {
+            cancelUrl: session.cancel_url,
+            successUrl: session.success_url,
+            url: session.url
+        }
     }
 
     async stripeWebhook(req: Request, res: Response) {
@@ -55,10 +65,13 @@ export class PaymentsService {
         switch (event.type) {
             case 'charge.succeeded':
                 const chargeSucceeded = event.data.object as Stripe.Charge;
-                console.log({
-                    metadata: chargeSucceeded.metadata,
-                    orderId: chargeSucceeded.metadata.orderId
-                })
+                const payload = {
+                    stripePaymentId: chargeSucceeded.id,
+                    orderId: chargeSucceeded.metadata.orderId,
+                    receiptUrl: chargeSucceeded.receipt_url
+                }
+                // this.logger.log(`Payment succeeded: ${JSON.stringify(payload)}`);
+                this.client.emit('payment.succeeded', payload);
                 break;
             default:
                 console.log(`Unhandled event type ${event.type}`);

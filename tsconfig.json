@@ -23,8 +23,8 @@
     "noFallthroughCasesInSwitch": false
   },
   "watchOptions": {
-  "watchFile": "dynamicPriorityPolling",
-  "watchDirectory": "dynamicPriorityPolling",
-  "excludeDirectories": ["**/node_modules", "dist"]
-}
+    "watchFile": "dynamicPriorityPolling",
+    "watchDirectory": "dynamicPriorityPolling",
+    "excludeDirectories": ["**/node_modules", "dist"]
+  }
 }
